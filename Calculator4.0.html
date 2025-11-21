@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Scientific Calculator Pro</title>
+  <link rel="icon" type="image/png" href="https://cdn-icons-png.flaticon.com/512/11447/11447359.png">
+  <!-- Using the robust math.js library for evaluation -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.8.0/math.js"></script>
+  <style>
+    /* UI styling is based on the preferred Calculator2.5.html design */
+    :root {
+      --bg: #0f1720;
+      --panel: #171a1f;
+      --accent: #06b6d4;
+      --text: #e6eef6;
+      --muted: #9aa4b2;
+    }
+
+    html,
+    body {
+      height: 100%;
+      margin: 0;
+      font-family: Inter, Segoe UI, Roboto, Arial;
+      background: linear-gradient(180deg, #0b1220, #101522);
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 10px;
+    }
+
+    .calc {
+      width: 720px;
+      max-width: 95vw;
+      background: linear-gradient(180deg, #0f1724, #0c1016);
+      border-radius: 12px;
+      padding: 12px;
+      box-shadow: 0 12px 40px rgba(2, 6, 23, .6);
+      display: grid;
+      grid-template-columns: 300px 1fr;
+      gap: 10px;
+    }
+
+    @media(max-width: 800px) {
+      .calc {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .screen {
+      grid-column: 1/-1;
+      padding: 6px;
+    }
+
+    .history {
+      background: var(--panel);
+      border-radius: 8px;
+      padding: 6px;
+      height: 120px;
+      overflow: auto;
+      border: 1px solid rgba(255, 255, 255, .03);
+      color: var(--muted);
+      font-family: monospace;
+      white-space: pre-wrap;
+      font-size: 12px;
+    }
+
+    .input-row {
+      display: flex;
+      gap: 6px;
+      margin-top: 6px;
+    }
+
+    #expr {
+      flex: 1;
+      padding: 6px;
+      border-radius: 6px;
+      border: none;
+      font-size: 20px; /* Larger font for better readability */
+      background: #081018;
+      color: var(--accent);
+      outline: none;
+      font-family: monospace;
+    }
+
+    .left,
+    .right {
+      padding: 6px;
+    }
+
+    .panel {
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.01), rgba(255, 255, 255, 0.005));
+      border-radius: 8px;
+      padding: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.03);
+    }
+
+    .keys,
+    .pad {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 6px;
+    }
+
+    button {
+      padding: 8px; /* Slightly more padding for a better feel */
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.03);
+      background: #0b1520;
+      color: var(--text);
+      font-weight: 600;
+      font-size: 14px;
+      cursor: pointer;
+      transition: transform 0.1s ease, background 0.1s ease;
+    }
+
+    button:hover {
+      background: #1e293b;
+      transform: translateY(-2px);
+    }
+    
+    button:active {
+        transform: translateY(1px);
+    }
+
+    .accent {
+      background: linear-gradient(180deg, #06b6d4, #0891b2);
+      color: #001219;
+    }
+
+    .danger {
+      background: linear-gradient(180deg, #ff6b6b, #ef4444);
+      color: #120003;
+    }
+
+    .equal {
+      grid-column: span 2;
+      background: linear-gradient(180deg, #22c55e, #16a34a);
+      color: #04120a;
+    }
+
+    .small {
+      font-size: 12px;
+      color: var(--muted);
+    }
+    
+    .toggle {
+        background-color: #334155;
+    }
+    
+    .toggle.active {
+        background-color: var(--accent);
+        color: #001219;
+    }
+
+    .footer {
+      grid-column: 1/-1;
+      margin-top: 6px;
+      color: var(--muted);
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+  </style>
+</head>
+
+<body>
+    <div class="calc" role="application" aria-label="Scientific Calculator">
+        <div class="screen">
+            <div class="history" id="history" aria-live="polite"></div>
+            <div class="input-row">
+                <input id="expr" placeholder="Enter expression" autocomplete="off" />
+                <button id="calcBtn" class="accent">=</button>
+            </div>
+        </div>
+
+        <div class="left">
+            <div class="panel">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+                    <div class="small">Functions</div>
+                    <div style="display:flex; gap: 5px;">
+                       <!-- Angle Mode Toggles from Calculator 3.0 -->
+                       <button id="degBtn" class="toggle active small" title="Use degrees">DEG</button>
+                       <button id="radBtn" class="toggle small" title="Use radians">RAD</button>
+                    </div>
+                </div>
+                <div class="keys" id="fnKeys">
+                    <button data-fn="sin">sin</button>
+                    <button data-fn="cos">cos</button>
+                    <button data-fn="tan">tan</button>
+                    <button data-fn="asin">asin</button>
+                    <button data-fn="acos">acos</button>
+                    
+                    <button data-fn="atan">atan</button>
+                    <button data-fn="log10">log</button>
+                    <button data-fn="ln">ln</button>
+                    <button data-fn="sqrt">√</button>
+                    <button data-fn="square">x²</button>
+
+                    <button data-fn="pow">xʸ</button>
+                    <button data-fn="fact">n!</button>
+                    <button data-const="pi">π</button>
+                    <button data-const="e">e</button>
+                    <button data-insert="%">%</button>
+                </div>
+            </div>
+
+            <div class="panel" style="margin-top:12px">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+                    <div class="small">Memory</div>
+                     <!-- Expanded Memory Controls from Calculator 3.0 -->
+                    <div>
+                        <button data-mem="mc" class="small">MC</button>
+                        <button data-mem="mr" class="small">MR</button>
+                        <button data-mem="m+" class="small">M+</button>
+                        <button data-mem="m-" class="small">M-</button>
+                    </div>
+                </div>
+                <div class="small">Click history item to reuse result</div>
+            </div>
+        </div>
+
+        <div class="right">
+            <div class="panel">
+                <div class="pad" id="pad">
+                    <button data-insert="7">7</button>
+                    <button data-insert="8">8</button>
+                    <button data-insert="9">9</button>
+                    <button data-insert="(">(</button>
+                    <button data-insert=")">)</button>
+
+                    <button data-insert="4">4</button>
+                    <button data-insert="5">5</button>
+                    <button data-insert="6">6</button>
+                    <button data-insert="*">×</button>
+                    <button data-insert="/">÷</button>
+
+                    <button data-insert="1">1</button>
+                    <button data-insert="2">2</button>
+                    <button data-insert="3">3</button>
+                    <button data-insert="+">+</button>
+                    <button data-insert="-">−</button>
+                    
+                    <button data-insert="0">0</button>
+                    <button data-insert=".">.</button>
+                    <button id="ansBtn" class="small">ANS</button>
+                    <button id="back" class="danger">⌫</button>
+                    <button id="clear" class="danger">C</button>
+                    
+                    <button class="equal" id="equals">Evaluate</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <div class="small">Implicit multiplication is supported (e.g., 2(3+4), (2)3, 3π)</div>
+            <div class="small">© Scientific Calculator Pro</div>
+        </div>
+    </div>
+
+    <script>
+        // DOM element references
+        const expr = document.getElementById('expr');
+        const historyEl = document.getElementById('history');
+        const equalsBtn = document.getElementById('equals');
+        const calcBtn = document.getElementById('calcBtn');
+        const backBtn = document.getElementById('back');
+        const clearBtn = document.getElementById('clear');
+        const ansBtn = document.getElementById('ansBtn');
+        const degBtn = document.getElementById('degBtn');
+        const radBtn = document.getElementById('radBtn');
+
+        // State variables
+        let lastAns = null;
+        let memory = 0;
+        let angleMode = 'deg'; // Default angle mode is degrees
+
+        // Focus on input field on page load
+        window.onload = () => { expr.focus(); }
+
+        // Helper function to insert text at the cursor's position
+        function insertAtCaret(str) {
+            const start = expr.selectionStart;
+            const end = expr.selectionEnd;
+            expr.value = expr.value.slice(0, start) + str + expr.value.slice(end);
+            expr.selectionStart = expr.selectionEnd = start + str.length;
+            expr.focus();
+        }
+        
+        // --- Event Listeners for Buttons ---
+
+        // Wire up number and operator buttons
+        document.querySelectorAll('[data-insert]').forEach(b => b.addEventListener('click', () => insertAtCaret(b.dataset.insert)));
+        
+        // Wire up function buttons
+        document.querySelectorAll('[data-fn]').forEach(b => b.addEventListener('click', () => {
+            const f = b.dataset.fn;
+            if (f === 'pow') insertAtCaret('^(');
+            else if (f === 'fact') insertAtCaret('!');
+            else if (f === 'square') insertAtCaret('^2');
+            else insertAtCaret(f + '(');
+        }));
+
+        // Wire up constant buttons
+        document.querySelectorAll('[data-const]').forEach(b => b.addEventListener('click', () => insertAtCaret(b.dataset.const)));
+        
+        // Wire up main action buttons
+        calcBtn.addEventListener('click', evaluateAndShow);
+        equalsBtn.addEventListener('click', evaluateAndShow);
+        clearBtn.addEventListener('click', () => { expr.value = ''; expr.focus(); });
+        ansBtn.addEventListener('click', () => { if (lastAns !== null) insertAtCaret(String(lastAns)); });
+
+        // Backspace button logic
+        backBtn.addEventListener('click', () => {
+            const s = expr.selectionStart, e = expr.selectionEnd;
+            if (s !== e) { // If text is selected, delete selection
+                expr.value = expr.value.slice(0, s) + expr.value.slice(e);
+                expr.selectionStart = expr.selectionEnd = s;
+            } else { // Otherwise, delete character before cursor
+                expr.value = expr.value.slice(0, s - 1) + expr.value.slice(s);
+                expr.selectionStart = expr.selectionEnd = Math.max(0, s - 1);
+            }
+            expr.focus();
+        });
+        
+        // Angle mode toggle logic
+        degBtn.addEventListener('click', () => {
+            angleMode = 'deg';
+            degBtn.classList.add('active');
+            radBtn.classList.remove('active');
+        });
+        radBtn.addEventListener('click', () => {
+            angleMode = 'rad';
+            radBtn.classList.add('active');
+            degBtn.classList.remove('active');
+        });
+
+        // Memory buttons logic
+        document.querySelectorAll('[data-mem]').forEach(b => b.addEventListener('click', () => {
+            const op = b.dataset.mem;
+            if (op === 'mc') {
+                memory = 0;
+            } else if (op === 'mr') {
+                insertAtCaret(String(memory));
+            } else if (op === 'm+' || op === 'm-') {
+                try {
+                    // Evaluate the current expression to add/subtract from memory
+                    const currentVal = math.evaluate(preprocess(expr.value));
+                    if (op === 'm+') memory += currentVal;
+                    if (op === 'm-') memory -= currentVal;
+                } catch (e) {
+                    // Silently fail if expression is invalid, or show an error
+                    console.error("Invalid expression for memory operation");
+                }
+            }
+        }));
+
+        // Allow reusing results from history
+        historyEl.addEventListener('click', (ev) => {
+            const item = ev.target.closest('.hist-item');
+            if (item) {
+                const val = item.getAttribute('data-val');
+                if (val) insertAtCaret(val);
+            }
+        });
+
+        // Evaluate on 'Enter' key press
+        expr.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') { 
+                e.preventDefault(); 
+                evaluateAndShow(); 
+            }
+        });
+
+        // --- Core Evaluation Logic ---
+
+        // Preprocessor to clean up and modify the expression before evaluation
+        function preprocess(input) {
+            if (!input) return '';
+            
+            // --- NEW: Handle percentages like 200+10% ---
+            // This regex finds a number, followed by + or -, followed by another number and a % sign
+            const percentageRegex = /(\d+(?:\.\d+)?)\s*([+-])\s*(\d+(?:\.\d+)?)%/g;
+            input = input.replace(percentageRegex, (match, p1, operator, p2) => {
+                // Replace the match with the calculated value, e.g., "200+(200*10/100)"
+                return `${p1} ${operator} (${p1} * ${p2} / 100)`;
+            });
+
+            // Normalize unicode symbols
+            input = input.replace(/π/g, 'pi').replace(/√/g, 'sqrt').replace(/×/g, '*').replace(/÷/g, '/');
+
+            // Tokenize to handle implicit multiplication
+            const tokens = input.match(/(\d+(?:\.\d+)?(?:[eE][+\-]?\d+)?|[a-zA-Z_]+[a-zA-Z0-9_]*|[\(\)\^\+\-\*\/!%]|\S)/g) || [];
+            
+            const finalTokens = [];
+            for (let i = 0; i < tokens.length; i++) {
+                const token = tokens[i];
+                const prevToken = finalTokens.length > 0 ? finalTokens[finalTokens.length - 1] : null;
+
+                if (prevToken) {
+                    const isPrevNumber = !isNaN(prevToken);
+                    const isPrevConstant = ['pi', 'e'].includes(prevToken);
+                    const isPrevRParen = prevToken === ')';
+                    const isPrevFactorial = prevToken === '!';
+
+                    const isCurrentNumber = !isNaN(token);
+                    const isCurrentConstant = ['pi', 'e'].includes(token);
+                    const isCurrentLParen = token === '(';
+                    const isCurrentFunc = ['sqrt', 'sin', 'cos', 'tan', 'log', 'ln'].some(f => token.startsWith(f));
+                    
+                    // --- REFINED: Implicit multiplication logic ---
+                    // Insert '*' if a number/constant/paren is followed by another number/constant/paren/function
+                    if ((isPrevNumber || isPrevConstant || isPrevRParen || isPrevFactorial) && (isCurrentNumber || isCurrentConstant || isCurrentLParen || isCurrentFunc)) {
+                         finalTokens.push('*');
+                    }
+                }
+                finalTokens.push(token);
+            }
+
+            return finalTokens.join('');
+        }
+        
+        // Main function to evaluate the expression and update the display
+        function evaluateAndShow() {
+            const raw = expr.value.trim();
+            if (!raw) return;
+
+            let processedExpr;
+            try {
+                processedExpr = preprocess(raw);
+            } catch (err) {
+                pushHistory(raw, 'Pre-process Error');
+                return;
+            }
+
+            try {
+                // --- NEW: Create a custom scope for math.js to handle DEG/RAD ---
+                const scope = {};
+                const trigFunctions = ['sin', 'cos', 'tan', 'asin', 'acos', 'atan', 'csc', 'sec', 'cot'];
+                trigFunctions.forEach(name => {
+                    scope[name] = (arg) => {
+                        // Convert argument to radians if in degree mode before calling math.js function
+                        const argInRad = angleMode === 'deg' && !name.startsWith('a') ? math.unit(arg, 'deg').toRadians() : arg;
+                        const result = math[name](argInRad);
+                        // Convert result back to degrees if it's an inverse trig function in degree mode
+                        return angleMode === 'deg' && name.startsWith('a') ? math.unit(result, 'rad').to('deg').toNumber() : result;
+                    };
+                });
+                
+                // Use the custom scope to evaluate the expression
+                const result = math.evaluate(processedExpr, scope);
+                lastAns = (typeof result === 'number' && isFinite(result)) ? result : result;
+                pushHistory(raw, result);
+
+            } catch (err) {
+                pushHistory(raw, 'Error');
+            }
+            expr.value = '';
+            expr.focus();
+        }
+        
+        // Function to add a calculation to the history panel
+        function pushHistory(input, result) {
+            const resultStr = typeof result.toString === 'function' ? result.toString() : String(result);
+            const el = document.createElement('div');
+            el.className = 'hist-item';
+            el.style.cssText = 'display:flex; justify-content:space-between; padding:6px; border-bottom:1px solid rgba(255,255,255,0.02); font-family:monospace; cursor:pointer;';
+            el.setAttribute('data-val', resultStr);
+            el.innerHTML = `<div style="color:var(--muted)">${escapeHtml(input)}</div><div style="font-weight:800">${escapeHtml(resultStr)}</div>`;
+            historyEl.prepend(el);
+        }
+
+        // Helper to escape HTML to prevent injection issues in history
+        function escapeHtml(s) { 
+            return String(s).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m])); 
+        }
+
+    </script>
+</body>
+
+</html>
